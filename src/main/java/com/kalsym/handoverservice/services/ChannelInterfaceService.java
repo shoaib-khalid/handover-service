@@ -17,7 +17,7 @@ public class ChannelInterfaceService {
    private static final Logger LOG = LoggerFactory.getLogger("application");
 
 
-    public String sendMessage(SimpleMessage message, String url, String refId, boolean isGuest) throws Exception {
+    public String sendMessage(PushMessage message, String url, String refId, boolean isGuest) throws Exception {
         String logprefix = refId;
         LOG.info("[v{}][{}] {}", VersionHolder.VERSION, logprefix, "url: " + url);
         RestTemplate restTemplate = new RestTemplate();
@@ -25,12 +25,12 @@ public class ChannelInterfaceService {
         LOG.info("[v{}][{}] {}", VersionHolder.VERSION, logprefix, "response: " + response.getBody());
         return response.getBody();
     }  
-    public String sendMessage(MediaMessage message, String url, String refId, boolean isGuest) throws Exception {
-        String logprefix = refId;
-        LOG.info("[v{}][{}] {}", VersionHolder.VERSION, logprefix, "url: " + url);
-        RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<String> response = restTemplate.postForEntity(url, message, String.class);
-        LOG.info("[v{}][{}] {}", VersionHolder.VERSION, logprefix, "response: " + response.getBody());
-        return response.getBody();
-    }  
+//    public String sendMessage(MediaMessage message, String url, String refId, boolean isGuest) throws Exception {
+//        String logprefix = refId;
+//        LOG.info("[v{}][{}] {}", VersionHolder.VERSION, logprefix, "url: " + url);
+//        RestTemplate restTemplate = new RestTemplate();
+//        ResponseEntity<String> response = restTemplate.postForEntity(url, message, String.class);
+//        LOG.info("[v{}][{}] {}", VersionHolder.VERSION, logprefix, "response: " + response.getBody());
+//        return response.getBody();
+//    }  
 }

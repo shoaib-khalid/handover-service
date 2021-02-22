@@ -125,7 +125,7 @@ public class MessageController {
             if (requestObject.has("type") && "Message".equalsIgnoreCase(requestObject.getString("type")) && requestObject.has("messages") && requestObject.has("visitor")) {
                 JSONObject visitorData = requestObject.getJSONObject("visitor");
                 JSONObject customFields = visitorData.getJSONObject("customFields");
-
+                String agentName = requestObject.getJSONObject("agent").getString("username");
                 String senderId = visitorData.getString("token");
                 LOG.info("[{}] customFields: [{}]", senderId, customFields);
 
@@ -144,15 +144,19 @@ public class MessageController {
                     // normal text message
                     if (customFields.has(CustomFields.callbackUrl + "") && customFields.has(CustomFields.isGuest + "")) {
                         String url = customFields.getString(CustomFields.callbackUrl + "") + "callback/mediamessage/push/";
-                        MediaMessage msgPayload = new MediaMessage();
-                        msgPayload.setGuest(customFields.getBoolean(CustomFields.isGuest + ""));
-                        msgPayload.setType(mediaType);
+                        PushMessage msgPayload = new PushMessage();
+//                        msgPayload.setGuest(customFields.getBoolean(CustomFields.isGuest + ""));
+                        msgPayload.setGuest(true);
+                        msgPayload.setUrlType(mediaType.toString());
                         msgPayload.setUrl(fileUploadObj.getString("publicFilePath"));
                         List<String> receipients = new ArrayList<>();
                         receipients.add(senderId);
                         msgPayload.setRecipientIds(receipients);
                         msgPayload.setRefId(senderId);
+                        msgPayload.setSubTitle(agentName);
+                        msgPayload.setTitle(agentName);
                         LOG.info("Agent sent media message in chat, url to be called is: [{}] with media [{}]", url, msgPayload.getUrl());
+                        LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
                         channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
                     }
                 } else {
@@ -169,13 +173,17 @@ public class MessageController {
                             LOG.info("Agent sent message in chat, url to be called is: [{}]", url);
                         }
 //                        LOG.debug("is guest: [{}]", customFields.getString(CustomFields.isGuest+""));
-                        SimpleMessage msgPayload = new SimpleMessage();
-                        msgPayload.setGuest(Boolean.parseBoolean(customFields.getString(CustomFields.isGuest+"")));
+                        PushMessage msgPayload = new PushMessage();
+//                        msgPayload.setGuest(Boolean.parseBoolean(customFields.getString(CustomFields.isGuest+"")));
+                        msgPayload.setGuest(true);
                         msgPayload.setMessage(messageObj.getString("msg"));
                         List<String> receipients = new ArrayList<>();
                         receipients.add(senderId);
                         msgPayload.setRecipientIds(receipients);
                         msgPayload.setRefId(senderId);
+                        msgPayload.setSubTitle(agentName);
+                        msgPayload.setTitle(agentName);
+                        LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
                         channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
 
                     }
@@ -184,7 +192,7 @@ public class MessageController {
             }
         } catch (Exception ex) {
             LOG.error("Processing of take handover failed ", ex);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            return ResponseEntity.status(HttpStatus.OK).build();
         }
         return ResponseEntity.status(HttpStatus.OK).build();
     }
