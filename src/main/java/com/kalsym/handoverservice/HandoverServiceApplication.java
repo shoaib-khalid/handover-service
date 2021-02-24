@@ -8,6 +8,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -22,6 +23,7 @@ import org.springframework.web.client.RestTemplate;
  * @author z33Sh
  */
 @SpringBootApplication
+//@EnableMongoAuditing
 public class HandoverServiceApplication {
 
     @Value("${build.version:not-known}")

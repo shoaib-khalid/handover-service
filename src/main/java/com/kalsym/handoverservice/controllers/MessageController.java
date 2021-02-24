@@ -5,15 +5,13 @@ import com.kalsym.handoverservice.agent.models.VisitorPayload;
 import com.kalsym.handoverservice.models.*;
 import com.kalsym.handoverservice.agent.models.*;
 import com.kalsym.handoverservice.enums.MediaType;
-import com.kalsym.handoverservice.enums.MessageType;
+import com.kalsym.handoverservice.repositories.RoomsRepostiory;
 import com.kalsym.handoverservice.services.AgentInterfaceService;
 import com.kalsym.handoverservice.services.ChannelInterfaceService;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.annotation.Id;
 
 /**
  *
@@ -44,6 +43,9 @@ public class MessageController {
     private AgentInterfaceService agentInterfaceService;
     @Autowired
     private ChannelInterfaceService channelInterfaceService;
+
+    @Autowired
+    private RoomsRepostiory roomsRepository;
 
     /**
      * Endpoint for receiving customer messages from different channel wrappers.
@@ -72,7 +74,8 @@ public class MessageController {
                 customFields.add(new CustomField(CustomFields.isGuest, requestBody.getIsGuest() + "", true));
                 customFields.add(new CustomField(CustomFields.msgId, requestBody.getMsgId(), true));
                 customFields.add(new CustomField(CustomFields.referral, requestBody.getReferral(), true));
-                String roomId = refrenceId + "r";
+//                String roomId = refrenceId + "r";
+                String roomId = senderId;
                 String token = senderId;
 
                 Visitor visitor = new Visitor(senderId, token, "", customFields);
@@ -88,7 +91,17 @@ public class MessageController {
                     LOG.info("[{}] [{}] is room creation Success:  [{}] ", VersionHolder.VERSION, senderId, isVisitorRegistrationSuccess);
                     if (isRoomCreationSuccesss) {
                         // TODO: 3 - Send customer message to agent interface
+
                         Message msg = new Message(token, roomId, requestBody.getData());
+//                        JSONObject msg = new JSONObject("{\n"
+//                                + "  \"token\": \"" + token + "\",\n"
+//                                + "  \"rid\": \"" + roomId + "\",\n"
+//                                + "  \"msg\": \"" + requestBody.getData() + "\"\n"
+//                                + "}");
+//                        message.put("token", token);
+//                        message.put("rid", roomId);
+//                        message.put("msg", requestBody.getData());
+
                         JSONObject sendMessageResponse = agentInterfaceService.sendMessage(msg, refrenceId);
                         boolean isSendMessageSuccesss = sendMessageResponse.getBoolean("success");
                         LOG.info("[{}] [{}] is message sent Successfully:  [{}] ", VersionHolder.VERSION, senderId, isSendMessageSuccesss);
@@ -121,13 +134,13 @@ public class MessageController {
             JSONObject requestObject = new JSONObject(requestData);
 
             LOG.info("requestObject: [{}]", requestObject);
+            JSONObject visitorData = requestObject.getJSONObject("visitor");
+            JSONObject customFields = visitorData.getJSONObject("customFields");
+            String agentName = requestObject.getJSONObject("agent").getString("username");
+            String senderId = visitorData.getString("token");
 
-            if (requestObject.has("type") && "Message".equalsIgnoreCase(requestObject.getString("type")) && requestObject.has("messages") && requestObject.has("visitor")) {
-                JSONObject visitorData = requestObject.getJSONObject("visitor");
-                JSONObject customFields = visitorData.getJSONObject("customFields");
-                String agentName = requestObject.getJSONObject("agent").getString("username");
-                String senderId = visitorData.getString("token");
-                LOG.info("[{}] customFields: [{}]", senderId, customFields);
+            LOG.info("[{}] customFields: [{}]", senderId, customFields);
+            if (requestObject.has("type") && "Message".equalsIgnoreCase(requestObject.getString("type")) && requestObject.has("messages")) {
 
                 JSONArray messages = requestObject.getJSONArray("messages");
                 JSONObject messageObj = messages.getJSONObject(0);
@@ -165,7 +178,7 @@ public class MessageController {
                         String url;
                         if (messageObj.has("msg") && "closing".equalsIgnoreCase(messageObj.getString("msg"))) {
 
-                            url = customFields.getString(CustomFields.callbackUrl + "") + "conversation/handle/";
+                            url = customFields.getString(CustomFields.callbackUrl + "") + "callback/conversation/handle/";
                             LOG.info("Agent closed the chat, url to be called is: [{}]", url);
                         } else {
                             // normal text message
@@ -187,6 +200,35 @@ public class MessageController {
                         channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
 
                     }
+                }
+
+            } else if (requestObject.has("type") && "LivechatSession".equalsIgnoreCase(requestObject.getString("type")) && requestObject.has("closer") && requestObject.has("closedAt")) {
+                try {
+//                    List<Room> users = roomsRepository.findByFname("Eric");
+                    roomsRepository.deleteByFname(senderId);
+                    LOG.info("[{}] Delete room from mongo without waiting for response", senderId);
+                } catch (Exception ex) {
+                    LOG.error("Error deleting room ", ex);
+                }
+                // closing message
+                try {
+                    String url;
+
+                    url = customFields.getString(CustomFields.callbackUrl + "") + "callback/conversation/handle/";
+                    LOG.info("Agent closed the chat, url to be called is: [{}]", url);
+                    PushMessage msgPayload = new PushMessage();
+                    msgPayload.setGuest(true);
+                    msgPayload.setMessage("chat closed by agent");
+                    List<String> receipients = new ArrayList<>();
+                    receipients.add(senderId);
+                    msgPayload.setRecipientIds(receipients);
+                    msgPayload.setRefId(senderId);
+                    msgPayload.setSubTitle(agentName);
+                    msgPayload.setTitle(agentName);
+                    LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
+                    channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
+                } catch (Throwable ex) {
+                    LOG.error("Error sending request to wrapper", ex);
                 }
 
             }

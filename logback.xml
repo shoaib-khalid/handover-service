@@ -37,13 +37,16 @@
     </appender>
     
     <!-- LOG everything at INFO level -->
-    <root  level="info">
+    <root  level="DEBUG">
         <appender-ref ref="RollingFile" />
     </root>
 
+
     <!-- LOG "com.baeldung*" at TRACE level -->
-    <logger name="com.kalsym" level="trace" additivity="false">
+    <logger name="com.kalsym" level="trace" additivity="true">
+		 <appender-ref ref="Console" />
         <appender-ref ref="RollingFile" />
+
     </logger>
 
 </configuration>

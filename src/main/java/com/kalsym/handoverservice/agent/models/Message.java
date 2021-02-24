@@ -2,6 +2,7 @@ package com.kalsym.handoverservice.agent.models;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
+import lombok.Getter;
 import org.junit.platform.commons.util.ToStringBuilder;
 
 /**
@@ -27,7 +28,7 @@ public class Message {
      * @param msg
      */
     public Message(String token, String rid, String msg) {
-        super();
+//        super();
         this.token = token;
         this.rid = rid;
         this.msg = msg;

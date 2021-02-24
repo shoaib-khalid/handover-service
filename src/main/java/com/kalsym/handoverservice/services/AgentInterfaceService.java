@@ -9,6 +9,9 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -32,6 +35,7 @@ public class AgentInterfaceService {
         LOG.debug("[v{}][{}] {}", VersionHolder.VERSION, refId, "response: " + response.getBody());
         return new JSONObject(response.getBody());
     }
+
     public JSONObject sendMessage(Message payload, String refId) throws Exception {
         LOG.debug("[v{}][{}] {} ", VersionHolder.VERSION, refId, "agentInterfaceUrl: " + agentInterfaceUrl);
         RestTemplate restTemplate = new RestTemplate();
@@ -39,6 +43,19 @@ public class AgentInterfaceService {
         LOG.debug("[v{}][{}] {}", VersionHolder.VERSION, refId, "response: " + response.getBody());
         return new JSONObject(response.getBody());
     }
+//      public JSONObject sendMessage(JSONObject payload, String refId) throws Exception {
+//        LOG.debug("[v{}][{}] {} ", VersionHolder.VERSION, refId, "agentInterfaceUrl: " + agentInterfaceUrl);
+//        RestTemplate restTemplate = new RestTemplate();
+//        HttpHeaders headers = new HttpHeaders();
+//        headers.setContentType(MediaType.APPLICATION_JSON);
+//        HttpEntity<String> request = 
+//      new HttpEntity<>(payload.toString(), headers);
+//        
+////        ResponseEntity<String> response = restTemplate.postForEntity(agentInterfaceUrl + "/api/v1/livechat/message", payload, String.class);
+//        String response = restTemplate.postForObject(agentInterfaceUrl + "/api/v1/livechat/message", request, String.class);
+//        LOG.debug("[v{}][{}] {}", VersionHolder.VERSION, refId, "response: " + response);
+//        return new JSONObject(response);
+//    }
 
     public JSONObject createOrUpdateRoom(String token, String roomId, String refId) throws Exception {
         LOG.debug("[v{}][{}] {} ", VersionHolder.VERSION, refId, "agentInterfaceUrl: " + agentInterfaceUrl);
@@ -46,7 +63,7 @@ public class AgentInterfaceService {
         Map<String, String> params = new HashMap<>();
         params.put("token", token);
         params.put("rid", roomId);
-        String response = restTemplate.getForObject(agentInterfaceUrl + "/api/v1/livechat/room?token="+token+"&rid="+roomId, String.class);
+        String response = restTemplate.getForObject(agentInterfaceUrl + "/api/v1/livechat/room?token=" + token + "&rid=" + roomId, String.class);
         LOG.debug("[v{}][{}] {}", VersionHolder.VERSION, refId, "response: " + response);
         return new JSONObject(response);
     }
