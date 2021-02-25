@@ -136,7 +136,10 @@ public class MessageController {
             LOG.info("requestObject: [{}]", requestObject);
             JSONObject visitorData = requestObject.getJSONObject("visitor");
             JSONObject customFields = visitorData.getJSONObject("customFields");
-            String agentName = requestObject.getJSONObject("agent").getString("username");
+            String agentName = "agent";
+            if (requestObject.has("agent")) {
+                agentName = requestObject.getJSONObject("agent").getString("username");
+            }
             String senderId = visitorData.getString("token");
 
             LOG.info("[{}] customFields: [{}]", senderId, customFields);
