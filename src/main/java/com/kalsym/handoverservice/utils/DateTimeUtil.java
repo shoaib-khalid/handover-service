@@ -3,12 +3,16 @@ package com.kalsym.handoverservice.utils;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  * @author Sarosh
  */
 public class DateTimeUtil {
+
+    private final static Logger LOG = LoggerFactory.getLogger("application");
 
     /**
      * *
@@ -39,5 +43,31 @@ public class DateTimeUtil {
         c.add(Calendar.SECOND, seconds);
         Date expiryDate = c.getTime();
         return dateFormat.format(expiryDate);
+    }
+
+    /**
+     * Returns time difference in minutes from #actualTimeInMilli and current
+     * time
+     *
+     * @param actualTimeInMilli
+     * @return time difference in minutes or 0 in case of any exception
+     */
+    public static int getTimeDifferenceInMinutesFromMilli(long actualTimeInMilli) {
+        int timeDifferenceInMinutes = 0;
+        try {
+
+            // finding the time difference
+            long msec = System.currentTimeMillis() - actualTimeInMilli;
+            // converting it into seconds
+            long sec = msec / 1000L;
+            // converting it into minutes
+            long minutes = sec / 60L;
+            System.out.println(minutes + " minutes");
+            timeDifferenceInMinutes = (int) minutes;
+        } catch (Exception ex) {
+            LOG.error("Exception getting time difference, using default 0", ex);
+            timeDifferenceInMinutes = 0;
+        }
+        return timeDifferenceInMinutes;
     }
 }

@@ -1,5 +1,6 @@
 package com.kalsym.handoverservice.controllers;
 
+import com.kalsym.handoverservice.HandoverServiceApplication;
 import com.kalsym.handoverservice.VersionHolder;
 import com.kalsym.handoverservice.agent.models.VisitorPayload;
 import com.kalsym.handoverservice.models.*;
@@ -25,7 +26,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.data.annotation.Id;
 
 /**
  *
@@ -37,15 +37,15 @@ public class MessageController {
 
     private static final Logger LOG = LoggerFactory.getLogger("application");
     @Autowired
-    private Environment env;
+    private static Environment env;
 
     @Autowired
     private AgentInterfaceService agentInterfaceService;
     @Autowired
-    private ChannelInterfaceService channelInterfaceService;
+    private static ChannelInterfaceService channelInterfaceService;
 
     @Autowired
-    private RoomsRepostiory roomsRepository;
+    private static RoomsRepostiory roomsRepository;
 
     /**
      * Endpoint for receiving customer messages from different channel wrappers.
@@ -66,8 +66,20 @@ public class MessageController {
             LOG.info("[v{}] Request received from [{}]  with {}", VersionHolder.VERSION, senderId, "queryString: " + request.getQueryString());
             if (null != requestBody) {
                 LOG.info("[v{}][{}] {}", VersionHolder.VERSION, senderId, "body: " + requestBody.toString());
-
-                // TODO: 1 - Register/update Visitor
+                String enableConfirmationQueueMonitor = env.getProperty("enable.confirmation.queue.monitor", "no");
+                if ("YES".equalsIgnoreCase(enableConfirmationQueueMonitor)) {
+                    if (null != HandoverServiceApplication.customerResponseAwaitQueue.get(senderId)) {
+                        if ("NO".equalsIgnoreCase(requestBody.getData().trim())) {
+                            LOG.info("[v{}] [{}]customer does not want to continue chat with agent, close chat with agent", VersionHolder.VERSION, senderId);
+                            String url = requestBody.getCallbackUrl() + "callback/conversation/handle/";
+                            String agentName = env.getProperty("default.agent.name", "HS");
+                            String message = env.getProperty("customer.reject.confirmation.message", "Thank you for confirmation. you are no longer chatting with agent");
+                            closeChat(senderId, url, agentName, message);
+                            HandoverServiceApplication.customerResponseAwaitQueue.remove(senderId);
+                        }
+                    }
+                }
+                // 1 - Register/update Visitor
                 List<CustomField> customFields = new ArrayList<>();
                 customFields.add(new CustomField(CustomFields.callbackUrl, requestBody.getCallbackUrl(), true));
                 customFields.add(new CustomField(CustomFields.data, requestBody.getData(), true));
@@ -85,12 +97,12 @@ public class MessageController {
                 LOG.info("[{}] [{}] is visitor registration Success:  [{}] ", VersionHolder.VERSION, senderId, isVisitorRegistrationSuccess);
                 if (isVisitorRegistrationSuccess) {
 
-                    // TODO: 2 - Create/Update Room
+                    //  - Create/Update Room
                     JSONObject roomCreationResponse = agentInterfaceService.createOrUpdateRoom(token, roomId, refrenceId);
                     boolean isRoomCreationSuccesss = roomCreationResponse.getBoolean("success");
-                    LOG.info("[{}] [{}] is room creation Success:  [{}] ", VersionHolder.VERSION, senderId, isVisitorRegistrationSuccess);
+                    LOG.info("[{}] [{}] /:  [{}] ", VersionHolder.VERSION, senderId, isVisitorRegistrationSuccess);
                     if (isRoomCreationSuccesss) {
-                        // TODO: 3 - Send customer message to agent interface
+                        // - Send customer message to agent interface
 
                         Message msg = new Message(token, roomId, requestBody.getData());
 //                        JSONObject msg = new JSONObject("{\n"
@@ -105,6 +117,40 @@ public class MessageController {
                         JSONObject sendMessageResponse = agentInterfaceService.sendMessage(msg, refrenceId);
                         boolean isSendMessageSuccesss = sendMessageResponse.getBoolean("success");
                         LOG.info("[{}] [{}] is message sent Successfully:  [{}] ", VersionHolder.VERSION, senderId, isSendMessageSuccesss);
+
+                        // Do add conversation in new customer chats - not ideal solution, later do check if room is new or old
+                        String enableNewChatMonitor = ConfigReader.environment.getProperty("enable.new.chat.monitor", "no");
+                        if ("YES".equalsIgnoreCase(enableNewChatMonitor)) {
+
+                            DanglingData dd = new DanglingData(System.currentTimeMillis(), requestBody.getCallbackUrl());
+                            HandoverServiceApplication.newCustomerChats.put(senderId, dd);
+
+                            try {
+                                int wait = 0;
+                                int intermitentSleep = 5;
+                                int cummulativeWait = env.getProperty("max_wait_in_seconds_for_agent_response_before_rejecting", Integer.class, 300);
+                                do {
+                                    wait = wait + intermitentSleep;
+                                    Thread.sleep(intermitentSleep * 1000);
+                                    if (null == HandoverServiceApplication.newCustomerChats.get(senderId)) {
+                                        LOG.debug("[{}] [{}] agent already replied to chat, so exit loop ", VersionHolder.VERSION, senderId);
+                                        break;
+                                    }
+
+                                } while (wait < cummulativeWait);
+                                // check if chat still exists 
+                                if (null != HandoverServiceApplication.newCustomerChats.get(senderId)) {
+                                    HandoverServiceApplication.newCustomerChats.remove(senderId);
+
+                                    LOG.debug("[{}] [{}] agent  not replied to chat or no agent is available, intimate user ", VersionHolder.VERSION, senderId);
+                                    String rejectChatMessage = env.getProperty("message_for_reject_chat_for_no_agent_available", "No agent is available, Please try again later");
+                                    String url = requestBody.getCallbackUrl() + "callback/conversation/handle/";
+                                    closeChat(senderId, url, env.getProperty("default.agent.name", "HS"), rejectChatMessage);
+                                }
+                            } catch (Exception ex) {
+                                LOG.error("[{}] [{}] Exception: [{}]", VersionHolder.VERSION, senderId, ex);
+                            }
+                        }
 
                     }
                 }
@@ -127,7 +173,7 @@ public class MessageController {
      * @return
      */
     @RequestMapping(value = "outbound/agent/message", method = RequestMethod.POST, consumes = "Application/json")
-    public ResponseEntity<Void> takeConversationFromCustomerService(@RequestBody String requestData) {
+    public ResponseEntity<Void> outbound(@RequestBody String requestData) {
         try {
             LOG.info("requestData: [{}]", requestData);
 
@@ -141,7 +187,31 @@ public class MessageController {
                 agentName = requestObject.getJSONObject("agent").getString("username");
             }
             String senderId = visitorData.getString("token");
+            try {
+                // update agent message time and remove from customer confirmation
+                String enableDanglingChatDetector = env.getProperty("enable.dangling.chat.detector", "no");
+                if ("YES".equalsIgnoreCase(enableDanglingChatDetector)) {
+                    if (customFields.has(CustomFields.callbackUrl + "")) {
+                        String callbackUrl = customFields.getString(CustomFields.callbackUrl + "");
+                        DanglingData dd = new DanglingData(System.currentTimeMillis(), callbackUrl);
+                        HandoverServiceApplication.conversationsLastMessageTime.put(senderId, dd);
+                    }
+                }
+                String enableConfirmationQueueMonitor = env.getProperty("enable.confirmation.queue.monitor", "no");
+                if ("YES".equalsIgnoreCase(enableConfirmationQueueMonitor)) {
+                    HandoverServiceApplication.customerResponseAwaitQueue.remove(senderId);
+                }
 
+                // check if new chat exist, since agent replied, delete entry from hm
+                String enableNewChatMonitor = env.getProperty("enable.new.chat.monitor", "no");
+                if ("YES".equalsIgnoreCase(enableNewChatMonitor)) {
+                    if (null != HandoverServiceApplication.newCustomerChats.get(senderId)) {
+                        HandoverServiceApplication.newCustomerChats.remove(senderId);
+                    }
+                }
+            } catch (Exception ex) {
+
+            }
             LOG.info("[{}] customFields: [{}]", senderId, customFields);
             if (requestObject.has("type") && "Message".equalsIgnoreCase(requestObject.getString("type")) && requestObject.has("messages")) {
 
@@ -206,39 +276,65 @@ public class MessageController {
                 }
 
             } else if (requestObject.has("type") && "LivechatSession".equalsIgnoreCase(requestObject.getString("type")) && requestObject.has("closer") && requestObject.has("closedAt")) {
-                try {
-//                    List<Room> users = roomsRepository.findByFname("Eric");
-                    roomsRepository.deleteByFname(senderId);
-                    LOG.info("[{}] Delete room from mongo without waiting for response", senderId);
-                } catch (Exception ex) {
-                    LOG.error("Error deleting room ", ex);
-                }
-                // closing message
-                try {
-                    String url;
-
-                    url = customFields.getString(CustomFields.callbackUrl + "") + "callback/conversation/handle/";
-                    LOG.info("Agent closed the chat, url to be called is: [{}]", url);
-                    PushMessage msgPayload = new PushMessage();
-                    msgPayload.setGuest(true);
-                    msgPayload.setMessage("chat closed by agent");
-                    List<String> receipients = new ArrayList<>();
-                    receipients.add(senderId);
-                    msgPayload.setRecipientIds(receipients);
-                    msgPayload.setRefId(senderId);
-                    msgPayload.setSubTitle(agentName);
-                    msgPayload.setTitle(agentName);
-                    LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
-                    channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
-                } catch (Throwable ex) {
-                    LOG.error("Error sending request to wrapper", ex);
-                }
-
+                String message = "chat closed by agent";
+                String url = customFields.getString(CustomFields.callbackUrl + "") + "callback/conversation/handle/";
+                closeChat(senderId, url, agentName, message);
             }
         } catch (Exception ex) {
             LOG.error("Processing of take handover failed ", ex);
             return ResponseEntity.status(HttpStatus.OK).build();
         }
         return ResponseEntity.status(HttpStatus.OK).build();
+    }
+
+    public static void closeChat(String senderId, String url, String agentName, String message) {
+        try {
+            roomsRepository.deleteByFname(senderId);
+            LOG.info("[{}] Delete room from mongo without waiting for response", senderId);
+        } catch (Exception ex) {
+            LOG.error("Error deleting room ", ex);
+        }
+        // closing message
+        try {
+
+            LOG.info("Closing the chat, url to be called is: [{}]", url);
+            PushMessage msgPayload = new PushMessage();
+            msgPayload.setGuest(true);
+            msgPayload.setMessage(message);
+            List<String> receipients = new ArrayList<>();
+            receipients.add(senderId);
+            msgPayload.setRecipientIds(receipients);
+            msgPayload.setRefId(senderId);
+            msgPayload.setSubTitle(agentName);
+            msgPayload.setTitle(agentName);
+            LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
+            channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
+        } catch (Throwable ex) {
+            LOG.error("Error sending request to wrapper", ex);
+        }
+    }
+
+    public static String sendMessageToWrapper(String senderId, String url, String message) {
+        String response = "";
+        try {
+
+            LOG.info("Closing the chat, url to be called is: [{}]", url);
+            PushMessage msgPayload = new PushMessage();
+            msgPayload.setGuest(true);
+            msgPayload.setMessage(message);
+            List<String> receipients = new ArrayList<>();
+            receipients.add(senderId);
+            msgPayload.setRecipientIds(receipients);
+            msgPayload.setRefId(senderId);
+            String agentName = env.getProperty("default.agent.name", "HS");
+            msgPayload.setSubTitle(agentName);
+            msgPayload.setTitle(agentName);
+            LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
+            response = channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
+        } catch (Throwable ex) {
+            response = "Exception";
+            LOG.error("Error sending request to wrapper", ex);
+        }
+        return response;
     }
 }
