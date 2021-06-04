@@ -2,7 +2,6 @@ package com.kalsym.handoverservice.agent.models;
 
 import com.google.gson.annotations.Expose;
 import com.google.gson.annotations.SerializedName;
-import lombok.Getter;
 import org.junit.platform.commons.util.ToStringBuilder;
 
 /**
@@ -20,6 +19,25 @@ public class Message {
     @SerializedName("msg")
     @Expose
     public String msg;
+
+//    @SerializedName("agent")
+//    @Expose
+//    public Agent agent;
+
+//    /**
+//     *
+//     * @param token
+//     * @param rid
+//     * @param msg
+//     * @param agent
+//     */
+//    public Message(String token, String rid, String msg, Agent agent) {
+////        super();
+//        this.token = token;
+//        this.rid = rid;
+//        this.msg = msg;
+////        this.agent = agent;
+//    }
 
     /**
      *

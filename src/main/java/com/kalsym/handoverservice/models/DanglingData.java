@@ -15,9 +15,11 @@ public class DanglingData {
 
     long timeInMillis;
     String callBackUrl;
+    String refrenceId;
 
-    public DanglingData(long timeInMillis, String callBackUrl) {
+    public DanglingData(long timeInMillis, String callBackUrl, String refrenceId) {
         this.timeInMillis = timeInMillis;
         this.callBackUrl = callBackUrl;
+        this.refrenceId = refrenceId;
     }
 }

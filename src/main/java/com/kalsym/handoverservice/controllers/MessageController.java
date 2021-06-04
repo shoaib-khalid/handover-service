@@ -5,10 +5,13 @@ import com.kalsym.handoverservice.VersionHolder;
 import com.kalsym.handoverservice.agent.models.VisitorPayload;
 import com.kalsym.handoverservice.models.*;
 import com.kalsym.handoverservice.agent.models.*;
+import com.kalsym.handoverservice.config.ConfigReader;
 import com.kalsym.handoverservice.enums.MediaType;
 import com.kalsym.handoverservice.repositories.RoomsRepostiory;
 import com.kalsym.handoverservice.services.AgentInterfaceService;
 import com.kalsym.handoverservice.services.ChannelInterfaceService;
+import com.kalsym.handoverservice.services.FlowCoreService;
+import com.kalsym.handoverservice.services.StoresService;
 import java.util.ArrayList;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
@@ -17,9 +20,9 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,15 +40,120 @@ public class MessageController {
 
     private static final Logger LOG = LoggerFactory.getLogger("application");
     @Autowired
-    private static Environment env;
-
-    @Autowired
     private AgentInterfaceService agentInterfaceService;
     @Autowired
-    private static ChannelInterfaceService channelInterfaceService;
+    private StoresService storesService;
+    @Autowired
+    private FlowCoreService flowCoreService;
 
     @Autowired
-    private static RoomsRepostiory roomsRepository;
+    private ChannelInterfaceService channelInterfaceService;
+
+    @Autowired
+    private RoomsRepostiory roomsRepository;
+
+    /**
+     * Endpoint for receiving customer messages from different channel wrappers.
+     * Validates and forward the incoming message to live agents interface.
+     *
+     * @param request
+     * @return
+     */
+    @GetMapping(path = {"select/agent"}, name = "select-agent-get")
+    public ResponseEntity<String> selectAgent(HttpServletRequest request) {
+        LOG.info("[v{}] Request received for select/agent", VersionHolder.VERSION);
+        JSONObject agent = new JSONObject();
+        String agentUserName = ConfigReader.environment.getProperty("livechat.default.agent.username", "csr-router");
+        String agentId = ConfigReader.environment.getProperty("livechat.default.agent.id", "M2bNGEH27wT5fHEp4");
+        agent.put("_id", agentId);
+        agent.put("username", agentUserName);
+        LOG.info("[v{}] Return agent: {}", VersionHolder.VERSION, agent);
+        System.err.println(getStoreName("105350328414803", "2323423"));
+        return new ResponseEntity<>(agent.toString(), HttpStatus.OK);
+    }
+
+    /**
+     *
+     * @param referenceId
+     * @param refId
+     * @return
+     */
+    private String getStoreName(String referenceId, String refId) {
+        String storeName = "";
+        String storeId = "";
+
+        try {
+// Get storeId from flow-core service
+
+            JSONObject response = flowCoreService.getStoreId(referenceId, refId);
+            storeId = response.getJSONObject("data").getString("storeId");
+            LOG.info("[v{}][{}] Store ID from flow core: {} against referenceId: {}", VersionHolder.VERSION, refId, storeId, referenceId);
+            // Get store name from store service
+            JSONObject storeObject = storesService.getStore(storeId, refId);
+            storeName = storeObject.getJSONObject("data").getString("name");
+            LOG.info("[v{}][{}] Store name from store service: [{}] against storeId: {}", VersionHolder.VERSION, refId, storeName, storeId);
+
+        } catch (Exception ex) {
+            System.out.println("no store name found with referenceId ");
+        }
+        return storeName;
+    }
+//    /**
+//     *
+//     * @param referenceId
+//     * @param refId
+//     * @return
+//     */
+//    private Agent getCSRAgent(String referenceId, String refId) {
+//        JSONObject resultAgent = new JSONObject();
+//        try {
+//
+//            String storeId = "";
+//            JSONArray agentsArray = null;
+//
+//            try {// Get storeId from flow-core service
+//
+//                JSONObject response = flowCoreService.getStoreId(referenceId, refId);
+//                storeId = response.getJSONObject("data").getString("storeId");
+//                LOG.info("[v{}][{}] Store ID from flow core: {} against referenceId: {}", VersionHolder.VERSION, refId, storeId, referenceId);
+//                // Get agents ids from service agent
+//                JSONObject agentsObject = serviceAgentService.getAgents("STORE_CSR_COMPLAINT", storeId, refId);
+//                agentsArray = agentsObject.getJSONObject("data").getJSONArray("content");
+//            } catch (Exception ex) {
+//                System.out.println("no store found with referenceId ");
+//            }
+//            String agentUserName = ConfigReader.environment.getProperty("livechat.default.agent.username", "zeeshan-ks");
+//            String agentId = ConfigReader.environment.getProperty("livechat.default.agent.id", "nubj4bBZHctboNnXt");
+//            if (null == agentsArray) {
+//                // No agents for store found, send message to default agent
+//                LOG.info("[v{}][{}] Using default agent ID:{} agentUsername: {} because not found agents in from storeId: {}", VersionHolder.VERSION, refId, agentId, agentUserName, storeId);
+//            } else if (agentsArray.length() == 1) {
+//                // Only one agent exist, send message 
+//                JSONObject obj = agentsArray.getJSONObject(0);
+//                agentUserName = obj.getString("username");
+//                agentId = obj.getString("liveChatAgentId");
+//                LOG.info("[v{}][{}] Found agent ID:{} agentUsername: {} from storeId: {}", VersionHolder.VERSION, refId, agentId, agentUserName, storeId);
+//
+//            } else if (agentsArray.length() > 1) {
+//                // More than one agent found, choose random agent
+//                Random rand = new Random();
+//                int randomAgentIndex = rand.nextInt(agentsArray.length());
+//                JSONObject obj = agentsArray.getJSONObject(randomAgentIndex);
+//                agentUserName = obj.getString("username");
+//                agentId = obj.getString("liveChatAgentId");
+//                LOG.info("[v{}][{}] Selected random agent ID:{} agentUsername: {} from storeId: {}", VersionHolder.VERSION, refId, agentId, agentUserName, storeId);
+//            }
+//            resultAgent.put("agentId", agentId);
+//            resultAgent.put("agentUserName", agentUserName);
+//
+//        } catch (Exception ex) {
+//            System.out.println(ex);
+//            LOG.warn("Processing  failed: {}", ex);
+//            return null;
+//        }
+//
+//        return new Agent(resultAgent.getString("agentId"), resultAgent.getString("agentUserName"));
+//    }
 
     /**
      * Endpoint for receiving customer messages from different channel wrappers.
@@ -62,23 +170,29 @@ public class MessageController {
             @RequestParam(name = "senderId", required = true) String senderId,
             @RequestParam(name = "refrenceId", required = true) String refrenceId,
             @RequestBody(required = true) RequestPayload requestBody) {
+        String ref = "";
         try {
+
             LOG.info("[v{}] Request received from [{}]  with {}", VersionHolder.VERSION, senderId, "queryString: " + request.getQueryString());
-            if (null != requestBody) {
+            if (null != requestBody && null != requestBody.getReferenceId()) {
+                String referenceId = requestBody.getReferenceId();
+                ref = referenceId;
+
                 LOG.info("[v{}][{}] {}", VersionHolder.VERSION, senderId, "body: " + requestBody.toString());
-                String enableConfirmationQueueMonitor = env.getProperty("enable.confirmation.queue.monitor", "no");
+                String enableConfirmationQueueMonitor = ConfigReader.environment.getProperty("enable.confirmation.queue.monitor", "no");
                 if ("YES".equalsIgnoreCase(enableConfirmationQueueMonitor)) {
                     if (null != HandoverServiceApplication.customerResponseAwaitQueue.get(senderId)) {
                         if ("NO".equalsIgnoreCase(requestBody.getData().trim())) {
                             LOG.info("[v{}] [{}]customer does not want to continue chat with agent, close chat with agent", VersionHolder.VERSION, senderId);
                             String url = requestBody.getCallbackUrl() + "callback/conversation/handle/";
-                            String agentName = env.getProperty("default.agent.name", "HS");
-                            String message = env.getProperty("customer.reject.confirmation.message", "Thank you for confirmation. you are no longer chatting with agent");
-                            closeChat(senderId, url, agentName, message);
+                            String agentName = ConfigReader.environment.getProperty("default.agent.name", "HS");
+                            String message = ConfigReader.environment.getProperty("customer.reject.confirmation.message", "Thank you for confirmation. you are no longer chatting with agent");
+                            closeChat(senderId, url, agentName, message, referenceId, roomsRepository, channelInterfaceService);
                             HandoverServiceApplication.customerResponseAwaitQueue.remove(senderId);
                         }
                     }
                 }
+                String storeName = getStoreName(referenceId, refrenceId);
                 // 1 - Register/update Visitor
                 List<CustomField> customFields = new ArrayList<>();
                 customFields.add(new CustomField(CustomFields.callbackUrl, requestBody.getCallbackUrl(), true));
@@ -86,7 +200,10 @@ public class MessageController {
                 customFields.add(new CustomField(CustomFields.isGuest, requestBody.getIsGuest() + "", true));
                 customFields.add(new CustomField(CustomFields.msgId, requestBody.getMsgId(), true));
                 customFields.add(new CustomField(CustomFields.referral, requestBody.getReferral(), true));
-//                String roomId = refrenceId + "r";
+                customFields.add(new CustomField(CustomFields.referenceId, referenceId, true));
+                customFields.add(new CustomField(CustomFields.refId, refrenceId, true));
+                customFields.add(new CustomField(CustomFields.storeName, storeName, true));
+//                String roomId = referenceId + "r";
                 String roomId = senderId;
                 String token = senderId;
 
@@ -98,59 +215,59 @@ public class MessageController {
                 if (isVisitorRegistrationSuccess) {
 
                     //  - Create/Update Room
-                    JSONObject roomCreationResponse = agentInterfaceService.createOrUpdateRoom(token, roomId, refrenceId);
+                    JSONObject roomCreationResponse = agentInterfaceService.createOrUpdateRoom(token, roomId, referenceId);
                     boolean isRoomCreationSuccesss = roomCreationResponse.getBoolean("success");
                     LOG.info("[{}] [{}] /:  [{}] ", VersionHolder.VERSION, senderId, isVisitorRegistrationSuccess);
                     if (isRoomCreationSuccesss) {
                         // - Send customer message to agent interface
+//                        Agent agent = getCSRAgent(referenceId, senderId);
+                        Message msg;
+//                        if (null == agent) {
+                        msg = new Message(token, roomId, requestBody.getData());
+//                        } else {
+//                            msg = new Message(token, roomId, requestBody.getData(), agent);
+//                        }
 
-                        Message msg = new Message(token, roomId, requestBody.getData());
-//                        JSONObject msg = new JSONObject("{\n"
-//                                + "  \"token\": \"" + token + "\",\n"
-//                                + "  \"rid\": \"" + roomId + "\",\n"
-//                                + "  \"msg\": \"" + requestBody.getData() + "\"\n"
-//                                + "}");
-//                        message.put("token", token);
-//                        message.put("rid", roomId);
-//                        message.put("msg", requestBody.getData());
-
-                        JSONObject sendMessageResponse = agentInterfaceService.sendMessage(msg, refrenceId);
+                        JSONObject sendMessageResponse = agentInterfaceService.sendMessage(msg, referenceId);
                         boolean isSendMessageSuccesss = sendMessageResponse.getBoolean("success");
-                        LOG.info("[{}] [{}] is message sent Successfully:  [{}] ", VersionHolder.VERSION, senderId, isSendMessageSuccesss);
+                        LOG.info("[{}] [{}] is message sent Successfully:  [{}] with payload {}", VersionHolder.VERSION, senderId, isSendMessageSuccesss, msg);
+                        new Thread(() -> {
+                            // Do add conversation in new customer chats - not ideal solution, later do check if room is new or old
+                            String enableNewChatMonitor = ConfigReader.environment.getProperty("enable.new.chat.monitor", "no");
 
-                        // Do add conversation in new customer chats - not ideal solution, later do check if room is new or old
-                        String enableNewChatMonitor = ConfigReader.environment.getProperty("enable.new.chat.monitor", "no");
-                        if ("YES".equalsIgnoreCase(enableNewChatMonitor)) {
+                            if ("YES".equalsIgnoreCase(enableNewChatMonitor)) {
+                                LOG.info("[{}] [{}] monitoring new chat started");
 
-                            DanglingData dd = new DanglingData(System.currentTimeMillis(), requestBody.getCallbackUrl());
-                            HandoverServiceApplication.newCustomerChats.put(senderId, dd);
+                                DanglingData dd = new DanglingData(System.currentTimeMillis(), requestBody.getCallbackUrl(), referenceId);
+                                HandoverServiceApplication.newCustomerChats.put(senderId, dd);
 
-                            try {
-                                int wait = 0;
-                                int intermitentSleep = 5;
-                                int cummulativeWait = env.getProperty("max_wait_in_seconds_for_agent_response_before_rejecting", Integer.class, 300);
-                                do {
-                                    wait = wait + intermitentSleep;
-                                    Thread.sleep(intermitentSleep * 1000);
-                                    if (null == HandoverServiceApplication.newCustomerChats.get(senderId)) {
-                                        LOG.debug("[{}] [{}] agent already replied to chat, so exit loop ", VersionHolder.VERSION, senderId);
-                                        break;
+                                try {
+                                    int wait = 0;
+                                    int intermitentSleep = 5;
+                                    int cummulativeWait = ConfigReader.environment.getProperty("max_wait_in_seconds_for_agent_response_before_rejecting", Integer.class, 300);
+                                    do {
+                                        wait = wait + intermitentSleep;
+                                        Thread.sleep(intermitentSleep * 1000);
+                                        if (null == HandoverServiceApplication.newCustomerChats.get(senderId)) {
+                                            LOG.debug("[{}] [{}] agent already replied to chat, so exit loop ", VersionHolder.VERSION, senderId);
+                                            break;
+                                        }
+
+                                    } while (wait < cummulativeWait);
+                                    // check if chat still exists
+                                    if (null != HandoverServiceApplication.newCustomerChats.get(senderId)) {
+                                        HandoverServiceApplication.newCustomerChats.remove(senderId);
+
+                                        LOG.debug("[{}] [{}] agent  not replied to chat or no agent is available, intimate user ", VersionHolder.VERSION, senderId);
+                                        String rejectChatMessage = ConfigReader.environment.getProperty("message_for_reject_chat_for_no_agent_available", "No agent is available, Please try again later");
+                                        String url = requestBody.getCallbackUrl() + "callback/conversation/handle/";
+                                        closeChat(senderId, url, ConfigReader.environment.getProperty("default.agent.name", "HS"), rejectChatMessage, referenceId, roomsRepository, channelInterfaceService);
                                     }
-
-                                } while (wait < cummulativeWait);
-                                // check if chat still exists 
-                                if (null != HandoverServiceApplication.newCustomerChats.get(senderId)) {
-                                    HandoverServiceApplication.newCustomerChats.remove(senderId);
-
-                                    LOG.debug("[{}] [{}] agent  not replied to chat or no agent is available, intimate user ", VersionHolder.VERSION, senderId);
-                                    String rejectChatMessage = env.getProperty("message_for_reject_chat_for_no_agent_available", "No agent is available, Please try again later");
-                                    String url = requestBody.getCallbackUrl() + "callback/conversation/handle/";
-                                    closeChat(senderId, url, env.getProperty("default.agent.name", "HS"), rejectChatMessage);
+                                } catch (Exception ex) {
+                                    LOG.error("[{}] [{}] Exception: [{}]", VersionHolder.VERSION, senderId, ex);
                                 }
-                            } catch (Exception ex) {
-                                LOG.error("[{}] [{}] Exception: [{}]", VersionHolder.VERSION, senderId, ex);
                             }
-                        }
+                        }).start();
 
                     }
                 }
@@ -159,7 +276,21 @@ public class MessageController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
             }
         } catch (Exception ex) {
-            LOG.warn("Processing of inbound message failed: {}", ex.getMessage());
+            
+            try {
+                if (null != ex.getMessage() && ex.getMessage().contains("no online agents") && null != requestBody) {
+                    LOG.warn("[{}] [{}]  No all agents are unavailable at this moment, plz try later", VersionHolder.VERSION, senderId);
+                    String rejectChatMessage = ConfigReader.environment.getProperty("message_for_reject_chat_for_no_agent_available", "No agent is available, Please try again later");
+                    String urlHandle = requestBody.getCallbackUrl() + "callback/conversation/handle/";
+                    String urlPush = requestBody.getCallbackUrl() + "callback/textmessage/push/";
+                    sendMessageToWrapper(senderId, urlPush, rejectChatMessage, ref, channelInterfaceService, ConfigReader.environment.getProperty("default.agent.name", "HS"));
+                    closeChat(senderId, urlHandle, ConfigReader.environment.getProperty("default.agent.name", "HS"), rejectChatMessage, ref, roomsRepository, channelInterfaceService);
+                }else{
+                    LOG.warn("Processing of inbound message failed: {}", ex);
+                }
+            } catch (Exception exp) {
+                LOG.warn("Processing of inbound message failed: {}", exp);
+            }
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.status(HttpStatus.OK).build();
@@ -184,26 +315,28 @@ public class MessageController {
             JSONObject customFields = visitorData.getJSONObject("customFields");
             String agentName = "agent";
             if (requestObject.has("agent")) {
-                agentName = requestObject.getJSONObject("agent").getString("username");
+                agentName = requestObject.getJSONObject("agent").getString("name");
             }
             String senderId = visitorData.getString("token");
             try {
                 // update agent message time and remove from customer confirmation
-                String enableDanglingChatDetector = env.getProperty("enable.dangling.chat.detector", "no");
+                String enableDanglingChatDetector = ConfigReader.environment.getProperty("enable.dangling.chat.detector", "no");
                 if ("YES".equalsIgnoreCase(enableDanglingChatDetector)) {
                     if (customFields.has(CustomFields.callbackUrl + "")) {
                         String callbackUrl = customFields.getString(CustomFields.callbackUrl + "");
-                        DanglingData dd = new DanglingData(System.currentTimeMillis(), callbackUrl);
+                        DanglingData dd = new DanglingData(System.currentTimeMillis(), callbackUrl, customFields.getString(CustomFields.referenceId + ""));
                         HandoverServiceApplication.conversationsLastMessageTime.put(senderId, dd);
+                        LOG.debug("[{}]'s put in conversation last message", senderId);
+
                     }
                 }
-                String enableConfirmationQueueMonitor = env.getProperty("enable.confirmation.queue.monitor", "no");
+                String enableConfirmationQueueMonitor = ConfigReader.environment.getProperty("enable.confirmation.queue.monitor", "no");
                 if ("YES".equalsIgnoreCase(enableConfirmationQueueMonitor)) {
                     HandoverServiceApplication.customerResponseAwaitQueue.remove(senderId);
                 }
 
                 // check if new chat exist, since agent replied, delete entry from hm
-                String enableNewChatMonitor = env.getProperty("enable.new.chat.monitor", "no");
+                String enableNewChatMonitor = ConfigReader.environment.getProperty("enable.new.chat.monitor", "no");
                 if ("YES".equalsIgnoreCase(enableNewChatMonitor)) {
                     if (null != HandoverServiceApplication.newCustomerChats.get(senderId)) {
                         HandoverServiceApplication.newCustomerChats.remove(senderId);
@@ -228,7 +361,7 @@ public class MessageController {
                         mediaType = MediaType.IMAGE;
                     }
                     // normal text message
-                    if (customFields.has(CustomFields.callbackUrl + "") && customFields.has(CustomFields.isGuest + "")) {
+                    if (customFields.has(CustomFields.callbackUrl + "") && customFields.has(CustomFields.isGuest + "") && customFields.has(CustomFields.referenceId + "")) {
                         String url = customFields.getString(CustomFields.callbackUrl + "") + "callback/mediamessage/push/";
                         PushMessage msgPayload = new PushMessage();
 //                        msgPayload.setGuest(customFields.getBoolean(CustomFields.isGuest + ""));
@@ -239,6 +372,7 @@ public class MessageController {
                         receipients.add(senderId);
                         msgPayload.setRecipientIds(receipients);
                         msgPayload.setRefId(senderId);
+                        msgPayload.setReferenceId(customFields.getString(CustomFields.referenceId + ""));
                         msgPayload.setSubTitle(agentName);
                         msgPayload.setTitle(agentName);
                         LOG.info("Agent sent media message in chat, url to be called is: [{}] with media [{}]", url, msgPayload.getUrl());
@@ -246,7 +380,7 @@ public class MessageController {
                         channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
                     }
                 } else {
-                    if (customFields.has(CustomFields.callbackUrl + "") && customFields.has(CustomFields.isGuest + "")) {
+                    if (customFields.has(CustomFields.callbackUrl + "") && customFields.has(CustomFields.isGuest + "") && customFields.has(CustomFields.referenceId + "")) {
                         // closing message
                         String url;
                         if (messageObj.has("msg") && "closing".equalsIgnoreCase(messageObj.getString("msg"))) {
@@ -267,6 +401,7 @@ public class MessageController {
                         receipients.add(senderId);
                         msgPayload.setRecipientIds(receipients);
                         msgPayload.setRefId(senderId);
+                        msgPayload.setReferenceId(customFields.getString(CustomFields.referenceId + ""));
                         msgPayload.setSubTitle(agentName);
                         msgPayload.setTitle(agentName);
                         LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
@@ -278,7 +413,8 @@ public class MessageController {
             } else if (requestObject.has("type") && "LivechatSession".equalsIgnoreCase(requestObject.getString("type")) && requestObject.has("closer") && requestObject.has("closedAt")) {
                 String message = "chat closed by agent";
                 String url = customFields.getString(CustomFields.callbackUrl + "") + "callback/conversation/handle/";
-                closeChat(senderId, url, agentName, message);
+                String referenceId = customFields.getString(CustomFields.referenceId + "");
+                closeChat(senderId, url, agentName, message, referenceId, roomsRepository, channelInterfaceService);
             }
         } catch (Exception ex) {
             LOG.error("Processing of take handover failed ", ex);
@@ -287,9 +423,19 @@ public class MessageController {
         return ResponseEntity.status(HttpStatus.OK).build();
     }
 
-    public static void closeChat(String senderId, String url, String agentName, String message) {
+    /**
+     *
+     * @param senderId
+     * @param url
+     * @param agentName
+     * @param message
+     * @param referenceId
+     * @param roomSvc
+     * @param channelSvc
+     */
+    public static void closeChat(String senderId, String url, String agentName, String message, String referenceId, RoomsRepostiory roomSvc, ChannelInterfaceService channelSvc) {
         try {
-            roomsRepository.deleteByFname(senderId);
+            roomSvc.deleteByFname(senderId);
             LOG.info("[{}] Delete room from mongo without waiting for response", senderId);
         } catch (Exception ex) {
             LOG.error("Error deleting room ", ex);
@@ -305,16 +451,21 @@ public class MessageController {
             receipients.add(senderId);
             msgPayload.setRecipientIds(receipients);
             msgPayload.setRefId(senderId);
+            msgPayload.setReferenceId(referenceId);
             msgPayload.setSubTitle(agentName);
             msgPayload.setTitle(agentName);
             LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
-            channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
+            channelSvc.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
         } catch (Throwable ex) {
             LOG.error("Error sending request to wrapper", ex);
         }
     }
 
-    public static String sendMessageToWrapper(String senderId, String url, String message) {
+    public static String sendMessageToWrapper(String senderId, String url, String message, String referenceId, ChannelInterfaceService channelSvc) {
+        return sendMessageToWrapper(senderId, url, message, referenceId, channelSvc, ConfigReader.environment.getProperty("default.agent.name", "HS"));
+    }
+
+    public static String sendMessageToWrapper(String senderId, String url, String message, String referenceId, ChannelInterfaceService channelSvc, String agentName) {
         String response = "";
         try {
 
@@ -325,12 +476,13 @@ public class MessageController {
             List<String> receipients = new ArrayList<>();
             receipients.add(senderId);
             msgPayload.setRecipientIds(receipients);
-            msgPayload.setRefId(senderId);
-            String agentName = env.getProperty("default.agent.name", "HS");
+            msgPayload.setRefId(referenceId);
+            msgPayload.setReferenceId(referenceId);
+//            String agentName = ConfigReader.environment.getProperty("default.agent.name", "HS");
             msgPayload.setSubTitle(agentName);
             msgPayload.setTitle(agentName);
             LOG.debug("[{}] Sending message: [{}]", senderId, msgPayload.toString());
-            response = channelInterfaceService.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
+            response = channelSvc.sendMessage(msgPayload, url, senderId, msgPayload.isGuest());
         } catch (Throwable ex) {
             response = "Exception";
             LOG.error("Error sending request to wrapper", ex);

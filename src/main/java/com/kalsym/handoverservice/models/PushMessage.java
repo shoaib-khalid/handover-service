@@ -34,6 +34,9 @@ public class PushMessage {
     private String message;
     @Size(min = 2, max = 1000)
     private String refId;
+    
+    @Size(min = 2, max = 1000)
+    private String referenceId;
 
     @NotNull
     private boolean isGuest;
