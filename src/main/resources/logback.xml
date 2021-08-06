@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
-    <property name="LOGS" value="/var/kalsym/logs/handover-service" />
+    <!--<property name="LOGS" value="/var/kalsym/logs/handover-service" />-->
 
-    <property resource="application.properties"/>
+    <!--<property resource="application.properties"/>-->
 
     <appender name="Console"
         class="ch.qos.logback.core.ConsoleAppender">
@@ -16,12 +16,12 @@
 
     <appender name="RollingFile"
         class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOGS}/handover-service.log</file>
+        <file>handover-service.log</file>
 	<append>true</append>
         <rollingPolicy
             class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- rollover daily and when the file reaches 10 MegaBytes -->
-            <fileNamePattern>${LOGS}/archived/handover-service-%d{yyyy-MM-dd}.%i.log
+            <fileNamePattern>handover-service-%d{yyyy-MM-dd}.%i.log
             </fileNamePattern>
             <timeBasedFileNamingAndTriggeringPolicy
                 class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
