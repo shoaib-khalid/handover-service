@@ -11,7 +11,15 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.client.RestTemplate;
 import com.kalsym.handoverservice.models.*;
+import org.json.JSONObject;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 /**
  * 1. Handover service receives inbound messages from channel wrappers. 2. It
@@ -31,7 +39,6 @@ public class HandoverServiceApplication {
 
     @Value("${build.version:not-known}")
     String version;
-    
 
     private static final Logger LOG = LoggerFactory.getLogger("application");
     // to store new customer chats for handling dangling converations. Service should remove entry from this hashmap if no response from agent/RC for a fixed time. And also on agent/RC reply

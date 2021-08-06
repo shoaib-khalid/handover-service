@@ -276,7 +276,7 @@ public class MessageController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
             }
         } catch (Exception ex) {
-            
+
             try {
                 if (null != ex.getMessage() && ex.getMessage().contains("no online agents") && null != requestBody) {
                     LOG.warn("[{}] [{}]  No all agents are unavailable at this moment, plz try later", VersionHolder.VERSION, senderId);
@@ -285,7 +285,7 @@ public class MessageController {
                     String urlPush = requestBody.getCallbackUrl() + "callback/textmessage/push/";
                     sendMessageToWrapper(senderId, urlPush, rejectChatMessage, ref, channelInterfaceService, ConfigReader.environment.getProperty("default.agent.name", "HS"));
                     closeChat(senderId, urlHandle, ConfigReader.environment.getProperty("default.agent.name", "HS"), rejectChatMessage, ref, roomsRepository, channelInterfaceService);
-                }else{
+                } else {
                     LOG.warn("Processing of inbound message failed: {}", ex);
                 }
             } catch (Exception exp) {
@@ -435,8 +435,11 @@ public class MessageController {
      */
     public static void closeChat(String senderId, String url, String agentName, String message, String referenceId, RoomsRepostiory roomSvc, ChannelInterfaceService channelSvc) {
         try {
-            roomSvc.deleteByFname(senderId);
-            LOG.info("[{}] Delete room from mongo without waiting for response", senderId);
+            if ("yes".equalsIgnoreCase(ConfigReader.environment.getProperty("livechat.default.agent.username", "csr-router"))) {
+                roomSvc.deleteByFname(senderId);
+                LOG.info("[{}] Delete room from mongo without waiting for response", senderId);
+            }
+
         } catch (Exception ex) {
             LOG.error("Error deleting room ", ex);
         }
