@@ -507,7 +507,7 @@ public class MessageController {
      */
     public static void closeChat(String senderId, String url, String agentName, String message, String referenceId, RoomsRepostiory roomSvc, ChannelInterfaceService channelSvc) {
         try {
-            if ("yes".equalsIgnoreCase(ConfigReader.environment.getProperty("livechat.default.agent.username", "csr-router"))) {
+            if ("yes".equalsIgnoreCase(ConfigReader.environment.getProperty("do_delete_room_from_rc_on_close_chat", "yes"))) {
                 roomSvc.deleteByFname(senderId);
                 LOG.info("[{}] Delete room from mongo without waiting for response", senderId);
             }
