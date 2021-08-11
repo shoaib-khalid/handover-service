@@ -1,4 +1,15 @@
 ++++++++++++++++++++++++++++++++
++ handover-service 1.2.0-SNAPSHOT
+++++++++++++++++++++++++++++++++
+Flow:
+1. Extract custom fields of visitor from request
+2. Get Store ID from flow-core service
+3. Get agents of store from user-service
+    - curl -X GET "http://209.58.160.20:1201/clients/?storeId=8913d06f-a63f-4a16-8059-2a30a517663a&page=0&pageSize=20" -H "accept: */*" -H "Authorization: Bearer Bearer AccessToken"
+4. Check which agents are online from rocketchat db
+5. Reply with random available agents
+
+++++++++++++++++++++++++++++++++
 + handover-service 1.1-SNAPSHOT
 ++++++++++++++++++++++++++++++++
 

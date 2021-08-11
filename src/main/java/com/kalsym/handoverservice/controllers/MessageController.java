@@ -8,20 +8,26 @@ import com.kalsym.handoverservice.agent.models.*;
 import com.kalsym.handoverservice.config.ConfigReader;
 import com.kalsym.handoverservice.enums.MediaType;
 import com.kalsym.handoverservice.repositories.RoomsRepostiory;
+import com.kalsym.handoverservice.repositories.UserRepository;
 import com.kalsym.handoverservice.services.AgentInterfaceService;
 import com.kalsym.handoverservice.services.ChannelInterfaceService;
 import com.kalsym.handoverservice.services.FlowCoreService;
 import com.kalsym.handoverservice.services.StoresService;
+
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 /**
  *
@@ -52,6 +59,10 @@ public class MessageController {
     @Autowired
     private RoomsRepostiory roomsRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+
     /**
      * Endpoint for receiving customer messages from different channel wrappers.
      * Validates and forward the incoming message to live agents interface.
@@ -60,16 +71,77 @@ public class MessageController {
      * @return
      */
     @GetMapping(path = {"select/agent"}, name = "select-agent-get")
-    public ResponseEntity<String> selectAgent(HttpServletRequest request) {
+    public ResponseEntity<?> selectAgent(HttpServletRequest request,
+                                              @RequestParam String referenceId,
+                                              @RequestParam String refId) {
+//        LOG.info(request.getQueryString()+"", VersionHolder.VERSION);
         LOG.info("[v{}] Request received for select/agent", VersionHolder.VERSION);
+        JSONObject storeObject = new JSONObject();
+        try {
+            storeObject = flowCoreService.getStoreId(referenceId, refId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal Server Error");
+        }
+
+        String storeId = storeObject.getJSONObject("data").get("storeId").toString();
+        String USER_SERVICE_URL = ConfigReader.environment.getProperty("user.service.url", "http://209.58.160.20:1201/clients/?storeId=")+storeId;
+        RestTemplate getAgentsFromStoreRequest = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Authorization", "Bearer accessToken");
+        HttpEntity<String> body = new HttpEntity<>(headers);
+        ResponseEntity<String> response = getAgentsFromStoreRequest.exchange(USER_SERVICE_URL, HttpMethod.GET, body, String.class);
+        JSONObject responseBody = new JSONObject(response.getBody());
+        System.out.println("--------------------------------------------");
+        System.out.println(responseBody);
+
+        JSONArray agentListRaw = responseBody.getJSONObject("data").getJSONArray("content");
+        List<JSONObject> agentList = new ArrayList<>();
+        for(int i = 0 ; i < agentListRaw.length(); i++){
+            agentList.add(agentListRaw.getJSONObject(i));
+        }
+        List<JSONObject> filteredAgents = agentList.stream()
+                .filter(a -> a.getString("roleId").equals("STORE_CSR_ADMIN") || a.getString("roleId").equals("SSTORE_CSR_COMPLAINT")).collect(Collectors.toList());
+
+
+        System.out.println("______________________FILTERED AGENTS____________________________");
+        System.out.println(filteredAgents);
+
+        List<User> onlineAgents = new ArrayList<>();
+        for(JSONObject jsonAgent: filteredAgents)
+        {
+            Optional<User> optUser = userRepository.findByUsername(jsonAgent.getString("username"));
+            if(optUser.isPresent())
+                onlineAgents.add(optUser.get());
+        }
+
+
+        System.out.println("_____________________ONLINE AGENTS_____________________________");
+        System.out.println(onlineAgents);
+
+
         JSONObject agent = new JSONObject();
-        String agentUserName = ConfigReader.environment.getProperty("livechat.default.agent.username", "csr-router");
-        String agentId = ConfigReader.environment.getProperty("livechat.default.agent.id", "M2bNGEH27wT5fHEp4");
-        agent.put("_id", agentId);
-        agent.put("username", agentUserName);
+        if(onlineAgents.size() == 1)
+        {
+            agent.put("_id", onlineAgents.get(0).id);
+            agent.put("username", onlineAgents.get(0).username);
+        }
+        else if(onlineAgents.size() > 1) {
+            agent.put("_id", onlineAgents.get(new Random().nextInt(onlineAgents.size())).id);
+            agent.put("username", onlineAgents.get(new Random().nextInt(onlineAgents.size())).username);
+        }
+        else
+        {
+            String agentUserName = ConfigReader.environment.getProperty("livechat.default.agent.username", "csr-router");
+            String agentId = ConfigReader.environment.getProperty("livechat.default.agent.id", "M2bNGEH27wT5fHEp4");
+            agent.put("_id", agentId);
+            agent.put("username", agentUserName);
+//            System.err.println(getStoreName("105350328414803", "2323423"));
+        }
+
         LOG.info("[v{}] Return agent: {}", VersionHolder.VERSION, agent);
-        System.err.println(getStoreName("105350328414803", "2323423"));
-        return new ResponseEntity<>(agent.toString(), HttpStatus.OK);
+//
+        return ResponseEntity.status(HttpStatus.OK).body(agent.toString());
     }
 
     /**

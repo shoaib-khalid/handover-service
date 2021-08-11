@@ -17,7 +17,7 @@ public class FlowCoreService {
 
     private static final Logger LOG = LoggerFactory.getLogger("application");
 
-    @Value("${flow.core.interface.url:http://209.58.160.20:7313/flows/}")
+    @Value("${flow.core.interface.url:http://209.58.160.20:5001/flows/}")
     String flowCoreInterfaceUrl;
 
     public JSONObject getStoreId(String referenceId, String refId) throws Exception {
