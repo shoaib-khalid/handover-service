@@ -129,7 +129,7 @@ public class MessageController {
             LOG.info("[v{}] Return agent: {}", VersionHolder.VERSION, agent);
             return ResponseEntity.status(HttpStatus.OK).body(agent.toString());
         } catch (Exception e) {
-            LOG.error("Exception :{}", ex);
+            LOG.error("Exception :{}", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal Server Error");
         }
     }
