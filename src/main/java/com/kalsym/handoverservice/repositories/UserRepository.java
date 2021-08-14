@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface UserRepository extends MongoRepository<User, String> {
 
-    @Query(value = "{'username' : ?0, 'status' : { $in : ['online']}}")
+    @Query(value = "{'username' : ?0, 'statusLivechat' : { $in : ['available']}}")
     public Optional<User> findByUsername(String username);
 
 }

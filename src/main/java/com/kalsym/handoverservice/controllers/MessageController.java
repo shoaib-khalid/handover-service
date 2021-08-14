@@ -62,7 +62,6 @@ public class MessageController {
     @Autowired
     private UserRepository userRepository;
 
-
     /**
      * Endpoint for receiving customer messages from different channel wrappers.
      * Validates and forward the incoming message to live agents interface.
@@ -72,76 +71,67 @@ public class MessageController {
      */
     @GetMapping(path = {"select/agent"}, name = "select-agent-get")
     public ResponseEntity<?> selectAgent(HttpServletRequest request,
-                                              @RequestParam String referenceId,
-                                              @RequestParam String refId) {
+            @RequestParam String referenceId,
+            @RequestParam String refId) {
 //        LOG.info(request.getQueryString()+"", VersionHolder.VERSION);
         LOG.info("[v{}] Request received for select/agent", VersionHolder.VERSION);
         JSONObject storeObject = new JSONObject();
         try {
             storeObject = flowCoreService.getStoreId(referenceId, refId);
+
+            String storeId = storeObject.getJSONObject("data").get("storeId").toString();
+            String USER_SERVICE_URL = ConfigReader.environment.getProperty("user.service.url", "http://209.58.160.20:1201/clients/?storeId=") + storeId;
+            RestTemplate getAgentsFromStoreRequest = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("Authorization", "Bearer accessToken");
+            HttpEntity<String> body = new HttpEntity<>(headers);
+            ResponseEntity<String> response = getAgentsFromStoreRequest.exchange(USER_SERVICE_URL, HttpMethod.GET, body, String.class);
+            JSONObject responseBody = new JSONObject(response.getBody());
+            System.out.println("--------------------------------------------");
+            System.out.println(responseBody);
+
+            JSONArray agentListRaw = responseBody.getJSONObject("data").getJSONArray("content");
+            List<JSONObject> agentList = new ArrayList<>();
+            for (int i = 0; i < agentListRaw.length(); i++) {
+                agentList.add(agentListRaw.getJSONObject(i));
+            }
+            List<JSONObject> filteredAgents = agentList.stream()
+                    .filter(a -> a.getString("roleId").equals("STORE_CSR_ADMIN") || a.getString("roleId").equals("STORE_CSR_COMPLAINT")).collect(Collectors.toList());
+
+            System.out.println("______________________FILTERED AGENTS____________________________");
+            System.out.println(filteredAgents);
+
+            List<User> onlineAgents = new ArrayList<>();
+            for (JSONObject jsonAgent : filteredAgents) {
+                Optional<User> optUser = userRepository.findByUsername(jsonAgent.getString("username"));
+                if (optUser.isPresent()) {
+                    onlineAgents.add(optUser.get());
+                }
+            }
+
+            System.out.println("_____________________ONLINE AGENTS_____________________________");
+            System.out.println(onlineAgents);
+
+            JSONObject agent = new JSONObject();
+            if (onlineAgents.size() == 1) {
+                agent.put("_id", onlineAgents.get(0).id);
+                agent.put("username", onlineAgents.get(0).username);
+            } else if (onlineAgents.size() > 1) {
+                agent.put("_id", onlineAgents.get(new Random().nextInt(onlineAgents.size())).id);
+                agent.put("username", onlineAgents.get(new Random().nextInt(onlineAgents.size())).username);
+            } else {
+                String agentUserName = ConfigReader.environment.getProperty("livechat.default.agent.username", "csr-router");
+                String agentId = ConfigReader.environment.getProperty("livechat.default.agent.id", "M2bNGEH27wT5fHEp4");
+                agent.put("_id", agentId);
+                agent.put("username", agentUserName);
+//            System.err.println(getStoreName("105350328414803", "2323423"));
+            }
+            LOG.info("[v{}] Return agent: {}", VersionHolder.VERSION, agent);
+            return ResponseEntity.status(HttpStatus.OK).body(agent.toString());
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.error("Exception :{}", ex);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal Server Error");
         }
-
-        String storeId = storeObject.getJSONObject("data").get("storeId").toString();
-        String USER_SERVICE_URL = ConfigReader.environment.getProperty("user.service.url", "http://209.58.160.20:1201/clients/?storeId=")+storeId;
-        RestTemplate getAgentsFromStoreRequest = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("Authorization", "Bearer accessToken");
-        HttpEntity<String> body = new HttpEntity<>(headers);
-        ResponseEntity<String> response = getAgentsFromStoreRequest.exchange(USER_SERVICE_URL, HttpMethod.GET, body, String.class);
-        JSONObject responseBody = new JSONObject(response.getBody());
-        System.out.println("--------------------------------------------");
-        System.out.println(responseBody);
-
-        JSONArray agentListRaw = responseBody.getJSONObject("data").getJSONArray("content");
-        List<JSONObject> agentList = new ArrayList<>();
-        for(int i = 0 ; i < agentListRaw.length(); i++){
-            agentList.add(agentListRaw.getJSONObject(i));
-        }
-        List<JSONObject> filteredAgents = agentList.stream()
-                .filter(a -> a.getString("roleId").equals("STORE_CSR_ADMIN") || a.getString("roleId").equals("SSTORE_CSR_COMPLAINT")).collect(Collectors.toList());
-
-
-        System.out.println("______________________FILTERED AGENTS____________________________");
-        System.out.println(filteredAgents);
-
-        List<User> onlineAgents = new ArrayList<>();
-        for(JSONObject jsonAgent: filteredAgents)
-        {
-            Optional<User> optUser = userRepository.findByUsername(jsonAgent.getString("username"));
-            if(optUser.isPresent())
-                onlineAgents.add(optUser.get());
-        }
-
-
-        System.out.println("_____________________ONLINE AGENTS_____________________________");
-        System.out.println(onlineAgents);
-
-
-        JSONObject agent = new JSONObject();
-        if(onlineAgents.size() == 1)
-        {
-            agent.put("_id", onlineAgents.get(0).id);
-            agent.put("username", onlineAgents.get(0).username);
-        }
-        else if(onlineAgents.size() > 1) {
-            agent.put("_id", onlineAgents.get(new Random().nextInt(onlineAgents.size())).id);
-            agent.put("username", onlineAgents.get(new Random().nextInt(onlineAgents.size())).username);
-        }
-        else
-        {
-            String agentUserName = ConfigReader.environment.getProperty("livechat.default.agent.username", "csr-router");
-            String agentId = ConfigReader.environment.getProperty("livechat.default.agent.id", "M2bNGEH27wT5fHEp4");
-            agent.put("_id", agentId);
-            agent.put("username", agentUserName);
-//            System.err.println(getStoreName("105350328414803", "2323423"));
-        }
-
-        LOG.info("[v{}] Return agent: {}", VersionHolder.VERSION, agent);
-//
-        return ResponseEntity.status(HttpStatus.OK).body(agent.toString());
     }
 
     /**
@@ -166,7 +156,7 @@ public class MessageController {
             LOG.info("[v{}][{}] Store name from store service: [{}] against storeId: {}", VersionHolder.VERSION, refId, storeName, storeId);
 
         } catch (Exception ex) {
-            System.out.println("no store name found with referenceId ");
+            LOG.error("no store name found with referenceId  {} and ex:{}", referenceId, ex);
         }
         return storeName;
     }
