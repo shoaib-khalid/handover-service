@@ -14,5 +14,5 @@ node {
    stage 'Build'
    // Run the maven build
    sh "env "
-   sh "${mvnHome}/bin/mvn clean install"
+   sh "/opt/maven/apache-maven-3.8.1/bin/mvn clean install"
 }
