@@ -14,5 +14,6 @@ node {
    stage 'Build'
    // Run the maven build
    sh "env "
+   sh "export JAVA_HOME=/usr/lib/jvm/java-1.8.0"
    sh "/opt/maven/apache-maven-3.8.1/bin/mvn clean install"
 }
