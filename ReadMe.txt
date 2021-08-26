@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 +++++++++++++++++++++++++++++++++++++++
+=======
+++++++++++++++++++++++++++++++++++++++++
+>>>>>>> f42ba9c4d66fddcd14e0c7a628b7ce704e87b8c3
 + handover-service 1.2.0-SNAPSHOT
-++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++
 Flow:
 1. Extract custom fields of visitor from request
 2. Get Store ID from flow-core service
