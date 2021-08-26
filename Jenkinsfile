@@ -20,6 +20,6 @@ node {
    }
 
    stage ('SINGLE BRANCH JOB') {
-       build job: 'java-handover-service', parameters: [[$class: 'StringParameterValue', name: 'payload', value: ${env.BRANCH_NAME}]]
+       build job: 'java-handover-service', parameters: [[$class: 'StringParameterValue', name: 'payload', value: ${BRANCH_NAME}]]
    }
 }
