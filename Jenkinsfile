@@ -13,6 +13,6 @@ node {
    // Mark the code build 'stage'....
    stage 'Build'
    // Run the maven build
-   sh "env"
+   sh "env "
    sh "mvn clean install"
 }
