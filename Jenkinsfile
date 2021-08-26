@@ -18,4 +18,8 @@ node {
    sh "export JAVA_HOME=/usr/lib/jvm/java-1.8.0"
    sh "/opt/maven/apache-maven-3.8.1/bin/mvn clean install -Dmaven.test.skip=true"
    }
+
+   stage ('SINGLE BRANCH JOB') {
+       build job: 'java-handover-service', parameters: [[$class: 'StringParameterValue', name: 'payload', value: $BRANCH_NAME]]
+   }
 }
