@@ -1,6 +1,6 @@
 node {
    // Mark the code checkout 'stage'....
-   stage 'Checkout'
+   stage  'Checkout'
 
    // Checkout code from repository
    checkout scm
