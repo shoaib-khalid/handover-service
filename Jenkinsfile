@@ -6,6 +6,6 @@ node {
    checkout scm
 
    stage ('Deploy') {
-       build job: 'java-handover-service', parameters: [[$class: 'StringParameterValue', name: 'payload', value:"${BRANCH_NAME}" ]]
+       build job: 'java-handover-service', parameters: [[$class: 'StringParameterValue', name: 'payload', value:"origin/${BRANCH_NAME}" ]]
    }
 }
