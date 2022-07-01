@@ -1,0 +1,144 @@
+affinity: {}
+applicationProdProperties:
+  configmap:
+    application-prod.properties: >
+      server.port=6001
+
+
+      #logging.config=logback.xml
+
+
+      spring.data.mongodb.authentication-database=admin
+
+      spring.data.mongodb.username=root
+
+      spring.data.mongodb.password=kalsym@123
+
+      spring.data.mongodb.database=rocketchat
+
+      spring.data.mongodb.port=27017
+
+      spring.data.mongodb.host=stable-mongodb-0.stable-mongodb-headless.default.svc.cluster.local
+
+      spring.jpa.hibernate.ddl-auto=update
+
+      spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+
+
+      default.agent.name=Symplified Customer Care
+       
+      agent.interface.url=https://live.symplified.it/
+
+
+      enable.new.chat.monitor=no
+
+      max_wait_in_seconds_for_agent_response_before_rejecting=300
+
+      message_for_reject_chat_for_no_agent_available=No agent is available,
+      Please try again later
+
+      enable.dangling.chat.detector=no
+
+      dangling.chat.qualify.minutes=15
+
+      dangling.chat.customer.query.message=Agents are offline, do you want to
+      continue chatting with agent? Reply with yes or no
+
+
+      enable.confirmation.queue.monitor=no
+
+      customer.confirmation.timeout.minutes=15
+
+      confirmation.queue.timeout.message=You session with live agent has ended
+
+      customer.reject.confirmation.message= Thank you for confirmation. you are
+      no longer chatting with agent
+
+
+      livechat.default.agent.username=csr-router
+
+      livechat.default.agent.id=M2bNGEH27wT5fHEp4
+
+
+      spring.jpa.hibernate.ddl-auto=update
+
+
+      do_delete_room_from_rc_on_close_chat=yes
+
+
+      flow.core.interface.url=https://api.symplified.it/flow-core/v1/flows/
+
+      store.service.url=https://api.symplified.it/product-service/v1/stores/
+
+
+
+      user.service.url=https://api.symplified.it/user-service/v1/clients/?storeId=
+  volumeMount:
+    - mountPath: /home/docker/Software/application-prod.properties
+      name: handover-service-approd-vol
+      subPath: application-prod.properties
+  volumes:
+    - configMap:
+        name: handover-service-approd-cm
+      name: handover-service-approd-vol
+applicationProperties:
+  configmap:
+    application.properties: >
+      # Default config (refrain from editting this config, please add in
+      application-prod.properties below)
+
+      spring.profiles.active=prod
+
+      proj.name=handover-service
+
+      build.version=@project.version@
+  volumeMount:
+    - mountPath: /home/docker/Software/application.properties
+      name: handover-service-ap-vol
+      subPath: application.properties
+  volumes:
+    - configMap:
+        name: handover-service-ap-cm
+      name: handover-service-ap-vol
+autoscaling:
+  enabled: false
+  maxReplicas: 100
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+fullnameOverride: ''
+image:
+  pullPolicy: Always
+  repository: kalsym/handover-service
+  tag: 1.2.2-SNAPSHOT
+imagePullSecrets:
+  - name: kalsym-docker-hub
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  className: ''
+  enabled: true
+  hosts:
+    - host: api.symplified.it
+      paths:
+        - path: /handover-service/v1(/|$)(.*)
+          pathType: ImplementationSpecific
+  tls:
+    - hosts:
+        - api.symplified.it
+      secretName: secret-tls-it
+logback: {}
+nameOverride: ''
+nodeSelector: {}
+podAnnotations: {}
+podSecurityContext: {}
+replicaCount: 1
+resources: {}
+securityContext: {}
+service:
+  port: 6001
+  type: ClusterIP
+serviceAccount:
+  annotations: {}
+  create: false
+  name: ''
+tolerations: []
